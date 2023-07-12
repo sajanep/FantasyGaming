@@ -1,9 +1,7 @@
-using System.IO;
-using System.Net;
-using System.Threading.Tasks;
-using System.Transactions;
 using FantasyGaming.Domain.Commands;
+using FantasyGaming.Domain.Messaging;
 using FantasyGaming.Functions.Models;
+using FantasyGaming.Functions.Utils;
 using FantasyGaming.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +11,8 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
-using Newtonsoft.Json;
+using System.Net;
+using System.Threading.Tasks;
 
 namespace FantasyGaming.Functions
 {
@@ -21,9 +20,12 @@ namespace FantasyGaming.Functions
     {
         private readonly ILogger<GameService> _logger;
 
-        public UserService(ILogger<GameService> log)
+        private readonly IMessageBus _messageBus;
+
+        public UserService(ILogger<GameService> log, IMessageBus messageBus)
         {
             _logger = log;
+            _messageBus = messageBus;
         }
 
         [FunctionName("Register")]
@@ -36,9 +38,9 @@ namespace FantasyGaming.Functions
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req,
             [DurableClient] IDurableOrchestrationClient client)
         {
-            _logger.LogInformation("C# HTTP trigger function processed a request.");
             string gameId = req.Query["gameId"];
             string userId = req.Query["userId"];
+            _logger.LogInformation("Register function received a request with gameid: {gameId} and userid:{userId}.", gameId, userId);
 
             var transactionItem = new TransactionItem
             {
@@ -46,16 +48,18 @@ namespace FantasyGaming.Functions
                 UserId = userId
             };
 
-            string instanceId = await client.StartNewAsync(nameof(Orchestrator.SagaOrchestrator), transactionItem.Id, transactionItem);
+            string instanceId = await client.StartNewAsync(nameof(Orchestrator.SagaOrchestrator), transactionItem);
 
-            string responseMessage = string.IsNullOrEmpty(gameId)
-                ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
-                : $"Hello, {gameId}. This HTTP triggered function executed successfully.";
+            string responseMessage = string.Format("Saga triggered with instance id {0}", instanceId);
+            _logger.LogInformation(responseMessage);
 
             return new OkObjectResult(responseMessage);
         }
 
-        
+        private static MessageHeader BuildHeader(string transactionId, string messageType, string source)
+        {
+            return new MessageHeader(transactionId, messageType, source);
+        }
     }
 }
 

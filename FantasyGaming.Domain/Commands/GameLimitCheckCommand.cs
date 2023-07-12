@@ -8,7 +8,7 @@ namespace FantasyGaming.Domain.Commands
 {
     public class GameLimitCheckCommand : BaseCommand
     {
-        public UserCreditCheckCommandContent Content { get; set; }
+        public GameLimitCheckCommandContent Content { get; set; }
     }
 
     public class GameLimitCheckCommandContent

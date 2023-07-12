@@ -7,7 +7,7 @@ namespace FantasyGaming.Functions.Utils
 {
     public static class DurableOrchestrationContextExtensions
     {
-        public static async Task<T> WaitForExternalEventWithTimeout<T>(IDurableOrchestrationContext ctx, Sources source, TimeSpan timeout)
+        public static async Task<T> WaitForExternalEventWithTimeout<T>(IDurableOrchestrationContext ctx, string name, TimeSpan timeout)
         {
             if (ctx is null) throw new ArgumentNullException(nameof(ctx));
             if (timeout < TimeSpan.MinValue) throw new ArgumentOutOfRangeException(nameof(timeout));
@@ -17,7 +17,7 @@ namespace FantasyGaming.Functions.Utils
 
             DateTime timeoutAt = ctx.CurrentUtcDateTime.Add(timeout);
             Task<T> timeoutTask = ctx.CreateTimer<T>(timeoutAt, state, cts.Token);
-            Task<T> waitForEventTask = ctx.WaitForExternalEvent<T>(source.ToString());
+            Task<T> waitForEventTask = ctx.WaitForExternalEvent<T>(name);
 
             Task<T> winner = await Task.WhenAny<T>(waitForEventTask, timeoutTask);
 

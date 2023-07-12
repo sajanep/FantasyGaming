@@ -1,10 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 using FantasyGaming.Domain.Commands;
 using FantasyGaming.Domain.Events;
 using FantasyGaming.Domain.Messaging;
@@ -14,8 +7,6 @@ using FantasyGaming.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.Documents;
-using Microsoft.Azure.ServiceBus;
 using Microsoft.Azure.ServiceBus.Core;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -23,6 +14,12 @@ using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace FantasyGaming.Functions
 {
@@ -51,10 +48,6 @@ namespace FantasyGaming.Functions
             string gameId = req.Query["gameId"];
             string activityId = req.Query["activityId"];
 
-            //string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            //dynamic data = JsonConvert.DeserializeObject(requestBody);
-            //name = name ?? data?.name;
-
             string responseMessage = string.IsNullOrEmpty(gameId)
                 ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
                 : $"Hello, {gameId}. This HTTP triggered function executed successfully.";
@@ -74,10 +67,6 @@ namespace FantasyGaming.Functions
             string gameId = req.Query["gameId"];
             string activityId = req.Query["activityId"];
 
-            //string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            //dynamic data = JsonConvert.DeserializeObject(requestBody);
-            //name = name ?? data?.name;
-
             string responseMessage = string.IsNullOrEmpty(gameId)
                 ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
                 : $"Hello, {gameId}. This HTTP triggered function executed successfully.";
@@ -86,26 +75,27 @@ namespace FantasyGaming.Functions
         }
 
         [FunctionName("CheckGameLimit")]
-        public void Run([ServiceBusTrigger("%GameSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
+        public async Task Run([ServiceBusTrigger("%GameSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
             MessageReceiver messageReceiver,
             [CosmosDB(
                 databaseName: @"%CosmosDbDatabaseName%",
                 containerName: @"%GameCollection%",
-                Connection = @"CosmosDbConnectionString")] CosmosClient client,
+                Connection ="CosmosDbConnectionString")] CosmosClient client,
             ILogger logger)
         {
             try
             {
                 // Get the message body from the incoming message object.
                 string inputMessageBody = Encoding.UTF8.GetString(message.Body);
-                logger.LogInformation($"C# ServiceBus queue trigger function processed message: {inputMessageBody}");
+                logger.LogInformation($"CheckGameLimit function received message: {inputMessageBody}");
                 var gameLimitCheckCommand = JsonConvert.DeserializeObject<GameLimitCheckCommand>(inputMessageBody);
 
-                // Credit check logic goes here
+                // Game limit check logic goes here
                 var container = client.GetContainer(Environment.GetEnvironmentVariable("CosmosDbDatabaseName"),
                  Environment.GetEnvironmentVariable("GameCollection"));
-                var gameInfo = container.GetItemLinqQueryable<GameInfo>().
-                    Where(x => x.UserId == gameLimitCheckCommand.Content.UserId).SingleOrDefault();
+                var gameInfo = container.GetItemLinqQueryable<GameInfo>(true).
+                    Where(x => x.UserId == gameLimitCheckCommand.Content.UserId)
+                    .AsEnumerable().FirstOrDefault();
 
                 var gameLimitCheckedEvent = BuildGameLimitCheckedEvent(gameLimitCheckCommand.Header.TransactionId);
                 if (gameInfo.GamesRegistered > 5)
@@ -117,13 +107,11 @@ namespace FantasyGaming.Functions
                     gameLimitCheckedEvent.IsGameLimitExceeded = false;
                 }
                 _messageBus.PublishEvent(gameLimitCheckedEvent);
-
-                messageReceiver.CompleteAsync(message.SystemProperties.LockToken);
             }
             catch (Exception exception)
             {
                 logger.LogError(exception, exception.Message);
-                messageReceiver.DeadLetterAsync(message.SystemProperties.LockToken);
+                throw;
             }
         }
 
@@ -135,7 +123,7 @@ namespace FantasyGaming.Functions
             [CosmosDB(
                 databaseName: @"%CosmosDbDatabaseName%",
                 containerName: @"%GameCollection%",
-                Connection = @"CosmosDbConnectionString")]
+                Connection = "CosmosDbConnectionString")]
                 IAsyncCollector<GameInfo> documentCollector)
         {
             var gameSeedData = new List<GameInfo> 

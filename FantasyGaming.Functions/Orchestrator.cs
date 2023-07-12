@@ -1,5 +1,6 @@
 ﻿using FantasyGaming.Domain.Commands;
 using FantasyGaming.Domain.Events;
+using FantasyGaming.Domain.Messaging;
 using FantasyGaming.Functions.Models;
 using FantasyGaming.Functions.Utils;
 using FantasyGaming.Infrastructure;
@@ -7,6 +8,7 @@ using Microsoft.Azure.Documents;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -32,8 +34,11 @@ namespace FantasyGaming.Functions
           ILogger logger)
         {
             TransactionItem item = context.GetInput<TransactionItem>();
+            item.Id = context.InstanceId;
+
+            logger.LogInformation("Starting Saga orchestration for the trassanction with {id}", item.Id);
+
             var orchestratorActivityFunction = nameof(OrchestratorActivity.SagaOrchestratorActivity);
-            
             var result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
 
             var creditCheckCommand = new UserCreditCheckCommand
@@ -41,45 +46,54 @@ namespace FantasyGaming.Functions
                 Content = new UserCreditCheckCommandContent
                 {
                     UserId = item.UserId
-                }
+                },
+                Header = BuildHeader(item.Id, nameof(UserCreditCheckCommand), Sources.User.ToString())
             };
             _messsageBus.SendCommand(creditCheckCommand);
 
-            var userCreditCheckedEvent = await DurableOrchestrationContextExtensions
-              .WaitForExternalEventWithTimeout<UserCreditChecked>(context, Sources.User, TimeSpan.FromSeconds(30));
+            var userCreditCheckedEventStr = await DurableOrchestrationContextExtensions
+              .WaitForExternalEventWithTimeout<string>(context, nameof(UserCreditChecked), TimeSpan.FromSeconds(60));
 
-            if(!userCreditCheckedEvent.IsEnoughCredit)
+            var userCreditCheckedEvent = JsonConvert.DeserializeObject<UserCreditChecked>(userCreditCheckedEventStr);
+            if (userCreditCheckedEvent != null && !userCreditCheckedEvent.IsEnoughCredit)
             {
-                logger.LogError("Saga Failed");
+                logger.LogError("Saga Failed since User does not have enough credit");
                 item.State = nameof(SagaState.Fail);
                 result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
             }
 
             var gameLimitCheckCommand = new GameLimitCheckCommand
             {
-                Content = new UserCreditCheckCommandContent
+                Content = new GameLimitCheckCommandContent
                 {
-                    UserId = item.UserId
-                }
+                    UserId = item.UserId,
+                    GameId = item.GameId,
+                },
+                Header = BuildHeader(item.Id, nameof(GameLimitCheckCommand), Sources.Game.ToString())
             };
             _messsageBus.SendCommand(gameLimitCheckCommand);
 
-            var gameLimitCheckedEvent = await DurableOrchestrationContextExtensions
-              .WaitForExternalEventWithTimeout<GameLimitChecked>(context, Sources.Game, TimeSpan.FromSeconds(30));
-            if (gameLimitCheckedEvent.IsGameLimitExceeded)
+            var gameLimitCheckedEventStr = await DurableOrchestrationContextExtensions
+              .WaitForExternalEventWithTimeout<string>(context, nameof(GameLimitChecked), TimeSpan.FromSeconds(60));
+            var gameLimitCheckedEvent = JsonConvert.DeserializeObject<GameLimitChecked>(gameLimitCheckedEventStr);
+            if (gameLimitCheckedEvent!= null && gameLimitCheckedEvent.IsGameLimitExceeded)
             {
-                logger.LogError("Saga Failed");
+                logger.LogError("Saga Failed since User exceeded Game Limit");
                 item.State = nameof(SagaState.Fail);
                 result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
             }
 
             if(userCreditCheckedEvent.IsEnoughCredit && !gameLimitCheckedEvent.IsGameLimitExceeded)
             {
-                logger.LogError("Saga Completed");
+                logger.LogInformation("Saga Completed");
                 item.State = nameof(SagaState.Success);
                 result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
             }
+        }
 
+        private static MessageHeader BuildHeader(string transactionId, string messageType, string source)
+        {
+            return new MessageHeader(transactionId, messageType, source);
         }
     }
 }

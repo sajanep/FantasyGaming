@@ -20,14 +20,6 @@ namespace FantasyGaming.Functions.Models
 
         [JsonProperty("state")]
         public string State { get; set; } = nameof(SagaState.Pending);
-
-        //[JsonProperty("accountFromId")]
-        //public string AccountFromId { get; set; }
-
-        //[JsonProperty("accountToId")]
-        //public string AccountToId { get; set; }
-
-        //[JsonProperty("amount")]
-        //public decimal Amount { get; set; }
+        
     }
 }

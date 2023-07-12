@@ -1,7 +1,7 @@
 variable "collections" {
   description = "Create Tables in SQL"
   type        = map(string)
-  default     = { "payment" = "id", "gameregistration" = "id", "saga" = "transactionId" }
+  default     = { "payment" = "userid", "gameregistration" = "userid", "saga" = "Id" }
 }
 
 variable "location" {

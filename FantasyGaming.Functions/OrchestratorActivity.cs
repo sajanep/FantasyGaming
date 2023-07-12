@@ -1,16 +1,11 @@
 ﻿using FantasyGaming.Functions.Models;
-using Microsoft.Azure.Documents;
-using Microsoft.Azure.WebJobs.Extensions.DurableTask;
-using Microsoft.Azure.WebJobs;
-using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
-using FantasyGaming.Domain.Events;
 using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace FantasyGaming.Functions
 {
@@ -22,12 +17,12 @@ namespace FantasyGaming.Functions
          [CosmosDB(
         databaseName: @"%CosmosDbDatabaseName%",
         containerName: @"%OrchestratorCollection%",
-        Connection = @"CosmosDbConnectionString")]
+        Connection = "CosmosDbConnectionString")]
       IAsyncCollector<TransactionItem> documentCollector,
           [CosmosDB(
         databaseName: @"%CosmosDbDatabaseName%",
         containerName: @"%OrchestratorCollection%",
-        Connection = @"CosmosDbConnectionString")] CosmosClient client,
+        Connection = "CosmosDbConnectionString")] CosmosClient client,
           ILogger logger)
         {
             if (item.State == SagaState.Pending.ToString())
@@ -38,8 +33,9 @@ namespace FantasyGaming.Functions
 
             var container = client.GetContainer(Environment.GetEnvironmentVariable("CosmosDbDatabaseName"),
                     Environment.GetEnvironmentVariable("OrchestratorCollection"));
-            var transactionItem = container.GetItemLinqQueryable<TransactionItem>().
-                Where(x => x.Id == item.Id).FirstOrDefault();
+            var transactionItem = container.GetItemLinqQueryable<TransactionItem>(true).
+                Where(x => x.Id == item.Id).
+                AsEnumerable().FirstOrDefault();
             transactionItem.State = item.State;
 
             await container.ReplaceItemAsync(transactionItem, transactionItem.Id);

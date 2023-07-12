@@ -1,27 +1,24 @@
-using System;
-using System.Text;
-using Microsoft.Azure.ServiceBus.Core;
-using Microsoft.Azure.ServiceBus;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Host;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using FantasyGaming.Domain.Commands;
-using Microsoft.Azure.Documents;
-using FantasyGaming.Functions.Models;
-using System.Linq;
-using FantasyGaming.Domain.Messaging;
-using FantasyGaming.Functions.Utils;
 using FantasyGaming.Domain.Events;
+using FantasyGaming.Domain.Messaging;
+using FantasyGaming.Functions.Models;
+using FantasyGaming.Functions.Utils;
 using FantasyGaming.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Cosmos;
+using Microsoft.Azure.ServiceBus.Core;
+using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
+using System.Text;
 using System.Threading.Tasks;
-using Microsoft.Azure.Cosmos;
 
 namespace FantasyGaming.Functions
 {
@@ -35,26 +32,27 @@ namespace FantasyGaming.Functions
         }
 
         [FunctionName("CheckPaymentCredit")]
-        public void Run([ServiceBusTrigger("%PaymentSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
+        public async Task Run([ServiceBusTrigger("%PaymentSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
             MessageReceiver messageReceiver,
             [CosmosDB(
                 databaseName: @"%CosmosDbDatabaseName%",
                 containerName: @"%PaymentCollection%",
-                Connection = @"CosmosDbConnectionString")] CosmosClient client,
+                Connection = "CosmosDbConnectionString")] CosmosClient client,
             ILogger logger)
         {
             try
             {
                 // Get the message body from the incoming message object.
                 string inputMessageBody = Encoding.UTF8.GetString(message.Body);
-                logger.LogInformation($"C# ServiceBus queue trigger function processed message: {inputMessageBody}");
+                logger.LogInformation($"CheckPaymentCredit function recieved message: {inputMessageBody}");
                 var creditCheckCommand = JsonConvert.DeserializeObject<UserCreditCheckCommand>(inputMessageBody);
 
                 // Credit check logic goes here
                 var container = client.GetContainer(Environment.GetEnvironmentVariable("CosmosDbDatabaseName"),
                   Environment.GetEnvironmentVariable("PaymentCollection"));
-                var paymentInfo = container.GetItemLinqQueryable<PaymentInfo>().
-                    Where(x => x.UserId == creditCheckCommand.Content.UserId).SingleOrDefault();
+                var paymentInfo = container.GetItemLinqQueryable<PaymentInfo>(true).
+                    Where(x => x.UserId == creditCheckCommand.Content.UserId)
+                    .AsEnumerable().FirstOrDefault();
 
                 var userCreditCheckedEvent = BuildUserCreditCheckedEvent(creditCheckCommand.Header.TransactionId);
                 if (paymentInfo.Balance > 10)
@@ -66,13 +64,11 @@ namespace FantasyGaming.Functions
                     userCreditCheckedEvent.IsEnoughCredit = false;
                 }
                 _messageBus.PublishEvent(userCreditCheckedEvent);
-
-                messageReceiver.CompleteAsync(message.SystemProperties.LockToken);
             }
             catch (Exception exception)
             {
                 logger.LogError(exception, exception.Message);
-                messageReceiver.DeadLetterAsync(message.SystemProperties.LockToken);
+                throw;
             }
         }
 
@@ -84,7 +80,7 @@ namespace FantasyGaming.Functions
             [CosmosDB(
                 databaseName: @"%CosmosDbDatabaseName%",
                 containerName: @"%PaymentCollection%",
-                Connection = @"CosmosDbConnectionString")]
+                Connection = "CosmosDbConnectionString")]
                 IAsyncCollector<PaymentInfo> documentCollector)
         {
             var gameSeedData = new List<PaymentInfo> 

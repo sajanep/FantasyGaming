@@ -27,7 +27,7 @@ variable "environment" {
 
 variable "location" {
   description = "Target Location"
-  default     = "East US 2"
+  default     = "southindia"
 }
 
 variable "resource_group_name" {

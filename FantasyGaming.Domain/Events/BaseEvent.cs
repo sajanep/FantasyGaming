@@ -2,8 +2,7 @@
 
 namespace FantasyGaming.Domain.Events
 {
-    public abstract class BaseEvent:Message
+    public class BaseEvent : Message
     {
-
     }
 }
