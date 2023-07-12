@@ -39,16 +39,6 @@ namespace FantasyGaming.Functions
             var orchestratorActivityFunction = nameof(OrchestratorActivity.SagaOrchestratorActivity);
             var result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
 
-            //var creditCheckCommand = new UserCreditCheckCommand
-            //{
-            //    Content = new UserCreditCheckCommandContent
-            //    {
-            //        UserId = item.UserId
-            //    },
-            //    Header = BuildHeader(item.Id, nameof(UserCreditCheckCommand), Sources.User.ToString())
-            //};
-            //_messageBus.SendCommand(creditCheckCommand);
-
             var userCreditCheckedEventStr = await DurableOrchestrationContextExtensions
               .WaitForExternalEventWithTimeout<string>(context, nameof(UserCreditChecked), TimeSpan.FromSeconds(60));
 
@@ -59,17 +49,6 @@ namespace FantasyGaming.Functions
                 item.State = nameof(SagaState.Fail);
                 result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
             }
-
-            //var gameLimitCheckCommand = new GameLimitCheckCommand
-            //{
-            //    Content = new GameLimitCheckCommandContent
-            //    {
-            //        UserId = item.UserId,
-            //        GameId = item.GameId,
-            //    },
-            //    Header = BuildHeader(item.Id, nameof(GameLimitCheckCommand), Sources.Game.ToString())
-            //};
-            //_messageBus.SendCommand(gameLimitCheckCommand);
 
             var gameLimitCheckedEventStr = await DurableOrchestrationContextExtensions
               .WaitForExternalEventWithTimeout<string>(context, nameof(GameLimitChecked), TimeSpan.FromSeconds(60));
