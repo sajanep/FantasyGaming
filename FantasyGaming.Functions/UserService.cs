@@ -18,11 +18,11 @@ namespace FantasyGaming.Functions
 {
     public class UserService
     {
-        private readonly ILogger<GameService> _logger;
+        private readonly ILogger<UserService> _logger;
 
         private readonly IMessageBus _messageBus;
 
-        public UserService(ILogger<GameService> log, IMessageBus messageBus)
+        public UserService(ILogger<UserService> log, IMessageBus messageBus)
         {
             _logger = log;
             _messageBus = messageBus;
@@ -42,13 +42,34 @@ namespace FantasyGaming.Functions
             string userId = req.Query["userId"];
             _logger.LogInformation("Register function received a request with gameid: {gameId} and userid:{userId}.", gameId, userId);
 
-            var transactionItem = new TransactionItem
+            var item = new TransactionItem
             {
                 GameId = gameId,
                 UserId = userId
             };
 
-            string instanceId = await client.StartNewAsync(nameof(Orchestrator.SagaOrchestrator), transactionItem);
+            var creditCheckCommand = new UserCreditCheckCommand
+            {
+                Content = new UserCreditCheckCommandContent
+                {
+                    UserId = item.UserId
+                },
+                Header = BuildHeader(item.Id, nameof(UserCreditCheckCommand), Sources.User.ToString())
+            };
+            _messageBus.SendCommand(creditCheckCommand);
+
+            var gameLimitCheckCommand = new GameLimitCheckCommand
+            {
+                Content = new GameLimitCheckCommandContent
+                {
+                    UserId = item.UserId,
+                    GameId = item.GameId,
+                },
+                Header = BuildHeader(item.Id, nameof(GameLimitCheckCommand), Sources.Game.ToString())
+            };
+            _messageBus.SendCommand(gameLimitCheckCommand);
+
+            string instanceId = await client.StartNewAsync(nameof(Orchestrator.SagaOrchestrator), item.Id, item);
 
             string responseMessage = string.Format("Saga triggered with instance id {0}", instanceId);
             _logger.LogInformation(responseMessage);

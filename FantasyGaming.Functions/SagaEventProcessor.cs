@@ -15,7 +15,6 @@ namespace FantasyGaming.Functions
     {
         [FunctionName(nameof(SagaEventProcessor))]
         public async Task Run([ServiceBusTrigger("%SagaReplyMessageQueue%", Connection = "ServiceBusConnection")] Message message,
-            MessageReceiver messageReceiver,
             [DurableClient] IDurableOrchestrationClient orchestrationClient,
             ILogger logger)
         {

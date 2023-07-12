@@ -26,7 +26,7 @@ namespace FantasyGaming.Functions
          firstRetryInterval: TimeSpan.FromSeconds(5),
          maxNumberOfAttempts: 3);
 
-        private static readonly IMessageBus _messsageBus = new MessageBus();
+        private static readonly IMessageBus _messageBus = new MessageBus();
 
         [FunctionName(nameof(SagaOrchestrator))]
         public static async Task SagaOrchestrator(
@@ -34,22 +34,20 @@ namespace FantasyGaming.Functions
           ILogger logger)
         {
             TransactionItem item = context.GetInput<TransactionItem>();
-            item.Id = context.InstanceId;
-
-            logger.LogInformation("Starting Saga orchestration for the trassanction with {id}", item.Id);
+            logger.LogInformation("Starting Saga orchestration for the trassanction with {id}", context.InstanceId);
 
             var orchestratorActivityFunction = nameof(OrchestratorActivity.SagaOrchestratorActivity);
             var result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
 
-            var creditCheckCommand = new UserCreditCheckCommand
-            {
-                Content = new UserCreditCheckCommandContent
-                {
-                    UserId = item.UserId
-                },
-                Header = BuildHeader(item.Id, nameof(UserCreditCheckCommand), Sources.User.ToString())
-            };
-            _messsageBus.SendCommand(creditCheckCommand);
+            //var creditCheckCommand = new UserCreditCheckCommand
+            //{
+            //    Content = new UserCreditCheckCommandContent
+            //    {
+            //        UserId = item.UserId
+            //    },
+            //    Header = BuildHeader(item.Id, nameof(UserCreditCheckCommand), Sources.User.ToString())
+            //};
+            //_messageBus.SendCommand(creditCheckCommand);
 
             var userCreditCheckedEventStr = await DurableOrchestrationContextExtensions
               .WaitForExternalEventWithTimeout<string>(context, nameof(UserCreditChecked), TimeSpan.FromSeconds(60));
@@ -62,16 +60,16 @@ namespace FantasyGaming.Functions
                 result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
             }
 
-            var gameLimitCheckCommand = new GameLimitCheckCommand
-            {
-                Content = new GameLimitCheckCommandContent
-                {
-                    UserId = item.UserId,
-                    GameId = item.GameId,
-                },
-                Header = BuildHeader(item.Id, nameof(GameLimitCheckCommand), Sources.Game.ToString())
-            };
-            _messsageBus.SendCommand(gameLimitCheckCommand);
+            //var gameLimitCheckCommand = new GameLimitCheckCommand
+            //{
+            //    Content = new GameLimitCheckCommandContent
+            //    {
+            //        UserId = item.UserId,
+            //        GameId = item.GameId,
+            //    },
+            //    Header = BuildHeader(item.Id, nameof(GameLimitCheckCommand), Sources.Game.ToString())
+            //};
+            //_messageBus.SendCommand(gameLimitCheckCommand);
 
             var gameLimitCheckedEventStr = await DurableOrchestrationContextExtensions
               .WaitForExternalEventWithTimeout<string>(context, nameof(GameLimitChecked), TimeSpan.FromSeconds(60));
@@ -85,9 +83,9 @@ namespace FantasyGaming.Functions
 
             if(userCreditCheckedEvent.IsEnoughCredit && !gameLimitCheckedEvent.IsGameLimitExceeded)
             {
-                logger.LogInformation("Saga Completed");
                 item.State = nameof(SagaState.Success);
                 result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
+                logger.LogInformation("Saga Completed successfully");
             }
         }
 

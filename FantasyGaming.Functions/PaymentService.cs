@@ -32,8 +32,7 @@ namespace FantasyGaming.Functions
         }
 
         [FunctionName("CheckPaymentCredit")]
-        public async Task Run([ServiceBusTrigger("%PaymentSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
-            MessageReceiver messageReceiver,
+        public void Run([ServiceBusTrigger("%PaymentSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
             [CosmosDB(
                 databaseName: @"%CosmosDbDatabaseName%",
                 containerName: @"%PaymentCollection%",

@@ -7,7 +7,6 @@ using FantasyGaming.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.ServiceBus.Core;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
@@ -75,8 +74,7 @@ namespace FantasyGaming.Functions
         }
 
         [FunctionName("CheckGameLimit")]
-        public async Task Run([ServiceBusTrigger("%GameSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
-            MessageReceiver messageReceiver,
+        public void Run([ServiceBusTrigger("%GameSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
             [CosmosDB(
                 databaseName: @"%CosmosDbDatabaseName%",
                 containerName: @"%GameCollection%",
