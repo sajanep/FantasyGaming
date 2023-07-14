@@ -32,10 +32,9 @@ namespace FantasyGaming.Functions
         [OpenApiOperation(operationId: "Register", tags: new[] { "name" })]
         [OpenApiParameter(name: "gameId", In = ParameterLocation.Query, Required = true, Type = typeof(string), Description = "The **GameId** parameter")]
         [OpenApiParameter(name: "userId", In = ParameterLocation.Query, Required = true, Type = typeof(string), Description = "The **UserId** parameter")]
-
         [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "text/plain", bodyType: typeof(string), Description = "The OK response")]
         public async Task<IActionResult> Register(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "user/register")] HttpRequest req,
             [DurableClient] IDurableOrchestrationClient client)
         {
             string gameId = req.Query["gameId"];

@@ -53,17 +53,24 @@ namespace FantasyGaming.Functions
                     Where(x => x.UserId == creditCheckCommand.Content.UserId)
                     .AsEnumerable().FirstOrDefault();
 
-                var userCreditCheckedEvent = BuildUserCreditCheckedEvent(creditCheckCommand);
-                if (paymentInfo.Balance > 10)
+                if (paymentInfo != null)
                 {
-                    userCreditCheckedEvent.IsEnoughCredit = true;
+                    var userCreditCheckedEvent = BuildUserCreditCheckedEvent(creditCheckCommand);
+                    if (paymentInfo.Balance > 10)
+                    {
+                        userCreditCheckedEvent.IsEnoughCredit = true;
+                    }
+                    else
+                    {
+                        userCreditCheckedEvent.IsEnoughCredit = false;
+                    }
+                    await Task.Delay(TimeSpan.FromSeconds(30));
+                    _messageBus.PublishEvent(userCreditCheckedEvent);
                 }
                 else
                 {
-                    userCreditCheckedEvent.IsEnoughCredit = false;
+                    logger.LogError("Payment info not found in Db for user {userId}", creditCheckCommand.Content.UserId);
                 }
-                await Task.Delay(TimeSpan.FromSeconds(45));
-                _messageBus.PublishEvent(userCreditCheckedEvent);
             }
             catch (Exception exception)
             {
@@ -83,7 +90,7 @@ namespace FantasyGaming.Functions
                 Connection = "CosmosDbConnectionString")]
                 IAsyncCollector<PaymentInfo> documentCollector)
         {
-            var gameSeedData = new List<PaymentInfo> 
+            var paymentSeedData = new List<PaymentInfo> 
             {
                 new PaymentInfo
                 {
@@ -107,7 +114,7 @@ namespace FantasyGaming.Functions
                 }
             };
 
-            foreach (PaymentInfo paymentInfo in gameSeedData)
+            foreach (PaymentInfo paymentInfo in paymentSeedData)
             {
                 await documentCollector.AddAsync(paymentInfo);
             }

@@ -95,18 +95,24 @@ namespace FantasyGaming.Functions
                 var gameInfo = container.GetItemLinqQueryable<GameInfo>(true).
                     Where(x => x.UserId == gameLimitCheckCommand.Content.UserId)
                     .AsEnumerable().FirstOrDefault();
-
-                var gameLimitCheckedEvent = BuildGameLimitCheckedEvent(gameLimitCheckCommand);
-                if (gameInfo.GamesRegistered > 5)
+                if (gameInfo != null)
                 {
-                    gameLimitCheckedEvent.IsGameLimitExceeded = true;
+                    var gameLimitCheckedEvent = BuildGameLimitCheckedEvent(gameLimitCheckCommand);
+                    if (gameInfo.GamesRegistered > 5)
+                    {
+                        gameLimitCheckedEvent.IsGameLimitExceeded = true;
+                    }
+                    else
+                    {
+                        gameLimitCheckedEvent.IsGameLimitExceeded = false;
+                    }
+                    await Task.Delay(TimeSpan.FromSeconds(30));
+                    _messageBus.PublishEvent(gameLimitCheckedEvent);
                 }
                 else
                 {
-                    gameLimitCheckedEvent.IsGameLimitExceeded = false;
+                    logger.LogError("Game info not found in Db for user {userId}", gameLimitCheckCommand.Content.UserId);
                 }
-                await Task.Delay(TimeSpan.FromSeconds(30));
-                _messageBus.PublishEvent(gameLimitCheckedEvent);
             }
             catch (Exception exception)
             {

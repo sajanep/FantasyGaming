@@ -10,7 +10,7 @@ namespace FantasyGaming.Functions.Models
     public class PaymentInfo
     {
         [JsonProperty("id")]
-        public string Id { get; set; }
+        public string Id { get; set; } = Guid.NewGuid().ToString();
 
         [JsonProperty("userid")]
         public string UserId { get; set; }
