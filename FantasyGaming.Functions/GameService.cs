@@ -10,6 +10,7 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
@@ -74,7 +75,7 @@ namespace FantasyGaming.Functions
         }
 
         [FunctionName("CheckGameLimit")]
-        public void Run([ServiceBusTrigger("%GameSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
+        public async Task Run([ServiceBusTrigger("%GameSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
             [CosmosDB(
                 databaseName: @"%CosmosDbDatabaseName%",
                 containerName: @"%GameCollection%",
@@ -95,7 +96,7 @@ namespace FantasyGaming.Functions
                     Where(x => x.UserId == gameLimitCheckCommand.Content.UserId)
                     .AsEnumerable().FirstOrDefault();
 
-                var gameLimitCheckedEvent = BuildGameLimitCheckedEvent(gameLimitCheckCommand.Header.TransactionId);
+                var gameLimitCheckedEvent = BuildGameLimitCheckedEvent(gameLimitCheckCommand);
                 if (gameInfo.GamesRegistered > 5)
                 {
                     gameLimitCheckedEvent.IsGameLimitExceeded = true;
@@ -104,6 +105,7 @@ namespace FantasyGaming.Functions
                 {
                     gameLimitCheckedEvent.IsGameLimitExceeded = false;
                 }
+                await Task.Delay(TimeSpan.FromSeconds(30));
                 _messageBus.PublishEvent(gameLimitCheckedEvent);
             }
             catch (Exception exception)
@@ -135,6 +137,16 @@ namespace FantasyGaming.Functions
                 {
                     UserId = "123456",
                     GamesRegistered = 3
+                },
+                new GameInfo
+                {
+                    UserId = "456123",
+                    GamesRegistered = 6
+                },
+                new GameInfo
+                {
+                    UserId = "987654",
+                    GamesRegistered = 8
                 }
             };
 
@@ -150,11 +162,12 @@ namespace FantasyGaming.Functions
             return new MessageHeader(transactionId, messageType, Sources.Game.ToString());
         }
 
-        private static GameLimitChecked BuildGameLimitCheckedEvent(string transactionId)
+        private static GameLimitChecked BuildGameLimitCheckedEvent(GameLimitCheckCommand gameLimitCheckCommand)
         {
             return new GameLimitChecked()
             {
-                Header = BuildEventHeader(transactionId, nameof(GameLimitChecked))
+                UserId = gameLimitCheckCommand.Content.UserId,
+                Header = BuildEventHeader(gameLimitCheckCommand.Header.TransactionId, nameof(GameLimitChecked))
             };
         }
     }

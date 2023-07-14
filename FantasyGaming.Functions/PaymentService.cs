@@ -32,7 +32,7 @@ namespace FantasyGaming.Functions
         }
 
         [FunctionName("CheckPaymentCredit")]
-        public void Run([ServiceBusTrigger("%PaymentSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
+        public async Task Run([ServiceBusTrigger("%PaymentSvcMessageQueue%", Connection = "ServiceBusConnection")] Microsoft.Azure.ServiceBus.Message message,
             [CosmosDB(
                 databaseName: @"%CosmosDbDatabaseName%",
                 containerName: @"%PaymentCollection%",
@@ -53,7 +53,7 @@ namespace FantasyGaming.Functions
                     Where(x => x.UserId == creditCheckCommand.Content.UserId)
                     .AsEnumerable().FirstOrDefault();
 
-                var userCreditCheckedEvent = BuildUserCreditCheckedEvent(creditCheckCommand.Header.TransactionId);
+                var userCreditCheckedEvent = BuildUserCreditCheckedEvent(creditCheckCommand);
                 if (paymentInfo.Balance > 10)
                 {
                     userCreditCheckedEvent.IsEnoughCredit = true;
@@ -62,6 +62,7 @@ namespace FantasyGaming.Functions
                 {
                     userCreditCheckedEvent.IsEnoughCredit = false;
                 }
+                await Task.Delay(TimeSpan.FromSeconds(45));
                 _messageBus.PublishEvent(userCreditCheckedEvent);
             }
             catch (Exception exception)
@@ -93,6 +94,16 @@ namespace FantasyGaming.Functions
                 {
                     UserId = "123456",
                     Balance = 5
+                },
+                new PaymentInfo
+                {
+                    UserId = "456123",
+                    Balance = 11
+                },
+                new PaymentInfo
+                {
+                    UserId = "987654",
+                    Balance = 4
                 }
             };
 
@@ -108,11 +119,12 @@ namespace FantasyGaming.Functions
             return new MessageHeader(transactionId, messageType, Sources.Payment.ToString());
         }
 
-        private static UserCreditChecked BuildUserCreditCheckedEvent(string transactionId)
+        private static UserCreditChecked BuildUserCreditCheckedEvent(UserCreditCheckCommand creditCheckCommand)
         {
             return new UserCreditChecked()
             {
-                Header = BuildEventHeader(transactionId, nameof(UserCreditChecked))
+                UserId = creditCheckCommand.Content.UserId,
+                Header = BuildEventHeader(creditCheckCommand.Header.TransactionId, nameof(UserCreditChecked))
             };
         }
     }

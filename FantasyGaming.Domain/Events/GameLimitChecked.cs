@@ -9,6 +9,8 @@ namespace FantasyGaming.Domain.Events
 {
     public class GameLimitChecked : BaseEvent
     {
+        public string UserId { get; set; }
+
         public bool IsGameLimitExceeded { get; set; }
     }
 }

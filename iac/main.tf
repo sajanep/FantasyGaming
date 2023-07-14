@@ -58,7 +58,7 @@ module "servicebus" {
   depends_on = [module.common]
 }
 
-module "cosmosdb"{
+module "cosmosdb" {
   location    = var.location
   environment = var.environment
 
@@ -68,7 +68,30 @@ module "cosmosdb"{
 
   source     = "./modules/cosmosdb"
   depends_on = [module.common]
+}
 
+module "functionapp" {
+  location    = var.location
+  environment = var.environment
+  storage_account_name = var.storage_account_name
+
+  # Output module common
+  resource_group_name         = module.common.resource_group_name
+  common_tags                 = module.common.common_tags
+
+  cosmosdb_account_endpoint = module.cosmosdb.cosmosdb_account_endpoint
+  cosmosdb_account_primarykey = module.cosmosdb.cosmosdb_account_primarykey
+  cosmosdb_databasename = module.cosmosdb.cosmosdb_databasename
+  payment_collection  = module.cosmosdb.payment_collection
+  game_collection  = module.cosmosdb.game_collection
+  orchestration_collection = module.cosmosdb.orchestration_collection
+  servicebus_connection = module.servicebus.servicebus_reader_writer_connection_string
+  paymentsvc_messagequeue = module.servicebus.paymentsvc_messages_queue_name
+  gamesvc_messagequeue = module.servicebus.gamesvc_messages_queue_name
+  sagareply_messagequeue = module.servicebus.sagareply_messages_queue_name
+
+  source     = "./modules/functionapp"
+  depends_on = [module.common, module.cosmosdb, module.servicebus]
 }
 
 

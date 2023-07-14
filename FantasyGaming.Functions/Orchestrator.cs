@@ -45,7 +45,7 @@ namespace FantasyGaming.Functions
             var userCreditCheckedEvent = JsonConvert.DeserializeObject<UserCreditChecked>(userCreditCheckedEventStr);
             if (userCreditCheckedEvent != null && !userCreditCheckedEvent.IsEnoughCredit)
             {
-                logger.LogError("Saga Failed since User does not have enough credit");
+                logger.LogError("Saga Failed since User {user} does not have enough credit", userCreditCheckedEvent.UserId);
                 item.State = nameof(SagaState.Fail);
                 result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
             }
@@ -55,7 +55,7 @@ namespace FantasyGaming.Functions
             var gameLimitCheckedEvent = JsonConvert.DeserializeObject<GameLimitChecked>(gameLimitCheckedEventStr);
             if (gameLimitCheckedEvent!= null && gameLimitCheckedEvent.IsGameLimitExceeded)
             {
-                logger.LogError("Saga Failed since User exceeded Game Limit");
+                logger.LogError("Saga Failed since User {user} exceeded Game Limit", gameLimitCheckedEvent.UserId);
                 item.State = nameof(SagaState.Fail);
                 result = await context.CallActivityWithRetryAsync<TransactionItem>(orchestratorActivityFunction, RetryOptions, item);
             }

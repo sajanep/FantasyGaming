@@ -83,3 +83,9 @@ variable "sagareply_messages_error_queue_name" {
   description = "Error queue name"
   default = "sagareply-error-queue"
 }
+
+variable storage_account_name { 
+  type = string
+  description = "Name of the storage account"
+  default = "fantasygamingstorage"
+}

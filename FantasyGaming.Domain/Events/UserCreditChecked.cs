@@ -9,6 +9,8 @@ namespace FantasyGaming.Domain.Events
 {
     public class UserCreditChecked : BaseEvent
     {
+        public string UserId { get; set; }
+
         public bool IsEnoughCredit { get; set; }
     }
 }
