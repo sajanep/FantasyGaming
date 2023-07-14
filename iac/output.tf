@@ -65,3 +65,12 @@ output "servicebus_reader_writer_connection_string" {
   value = module.servicebus.servicebus_reader_writer_connection_string
   sensitive = true
 }
+
+output "instrumentation_key" {
+  value = module.functionapp.instrumentation_key
+  sensitive = true
+}
+
+output "app_id" {
+  value = module.functionapp.app_id
+}

@@ -7,8 +7,8 @@ resource "azurerm_function_app" "fantasygaming-function" {
   resource_group_name       = var.resource_group_name
   location                  = var.location
   app_service_plan_id       = azurerm_app_service_plan.primary.id
-  storage_account_name      = azurerm_storage_account.sagalogic-storage-account.name
-  storage_account_access_key = azurerm_storage_account.sagalogic-storage-account.primary_access_key
+  storage_account_name      = azurerm_storage_account.fantasygaming-storage-account.name
+  storage_account_access_key = azurerm_storage_account.fantasygaming-storage-account.primary_access_key
   version                    = "~3"
 
   app_settings = {
@@ -24,7 +24,7 @@ resource "azurerm_function_app" "fantasygaming-function" {
     "SagaReplyMessageQueue": var.sagareply_messagequeue  
 
     "FUNCTIONS_WORKER_RUNTIME" = "dotnet",
-    "APPINSIGHTS_INSTRUMENTATIONKEY" = azurerm_application_insights.sagalogic-application-insights.instrumentation_key,
+    "APPINSIGHTS_INSTRUMENTATIONKEY" = azurerm_application_insights.fantasygaming-application-insights.instrumentation_key,
   }
 
   site_config {
@@ -50,14 +50,23 @@ resource azurerm_app_service_plan "primary" {
   }
 }
 
-resource "azurerm_application_insights" "sagalogic-application-insights" {
+resource "azurerm_log_analytics_workspace" "fantasygaming-log-workspace" {
+  name                = "fantasygaming-log-workspace"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+resource "azurerm_application_insights" "fantasygaming-application-insights" {
   name                = "${var.environment}-app-insights"
   location            = var.location
   resource_group_name = var.resource_group_name
+  workspace_id = azurerm_log_analytics_workspace.fantasygaming-log-workspace.id
   application_type    = "web"
 }
 
-resource "azurerm_storage_account" "sagalogic-storage-account" {
+resource "azurerm_storage_account" "fantasygaming-storage-account" {
   name                     = "${var.environment}${var.storage_account_name}"
   resource_group_name      = var.resource_group_name
   location                 = var.location
